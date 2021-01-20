@@ -152,7 +152,7 @@ def run(dataset, mode, input_path, experiment_name, dim, sigma, delta, N, regist
 
     model = EVeC(y.shape[1], sigma, delta, N)
 
-    predictions = np.zeros((y.shape[0], y.shape[1]))
+    predictions = np.zeros((y.shape[0], y.shape[1]), dtype=int)
     number_of_rules = np.zeros((y.shape[0], 1))
     time_ = np.zeros((y.shape[0], 1))
 
@@ -175,8 +175,8 @@ def run(dataset, mode, input_path, experiment_name, dim, sigma, delta, N, regist
                 model.plot(artifact_uri + str(i) + '_input.png', artifact_uri + str(i) + '_output.png', i)
 
     if register_experiment:
-        np.savetxt(artifact_uri + 'predictions.csv', predictions)
-        np.savetxt(artifact_uri + 'rules.csv', number_of_rules)
+        np.savetxt(artifact_uri + 'predictions.csv', predictions, fmt='%i')
+        np.savetxt(artifact_uri + 'rules.csv', number_of_rules, fmt='%i')
         np.savetxt(artifact_uri + 'time.csv', time_)
 
         plot_graph(number_of_rules, 'Number of rules', 'Step', artifact_uri + 'rules.png')

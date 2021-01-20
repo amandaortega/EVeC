@@ -165,9 +165,9 @@ class EVeC(object):
     def predict(self, x):
         # there is no rule
         if self.c == 0:
-            return np.zeros(self.L)
+            return np.zeros(self.L, dtype=int)
 
-        output_labels = np.zeros(self.L)
+        output_labels = np.zeros(self.L, dtype=int)
 
         for i in range(self.c):
             if self.firing_degree(i, x) >= self.sigma:
