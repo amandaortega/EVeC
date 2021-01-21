@@ -8,7 +8,7 @@ import mlflow
 import numpy as np
 from numpy import loadtxt
 import os
-from sklearn.metrics import mean_squared_error
+from sklearn.metrics import mean_squared_error, accuracy_score, recall_score, precision_score, f1_score, roc_auc_score
 import time
 from tqdm import tqdm
 import warnings
@@ -34,7 +34,7 @@ def plot_graph(y, y_label, x_label, file_name, y_aux=None, legend=None, legend_a
         plt.plot(y_aux)
         plt.legend([legend, legend_aux])
     else:
-        plt.annotate(str(round(y[-1, 0], 3)), xy=(y.shape[0], y[-1, 0]), ha='center')
+        plt.annotate(str(round(y[-1], 3)), xy=(y.shape[0], y[-1]), ha='center')
     
     plt.savefig(file_name)
     plt.close()
@@ -58,7 +58,7 @@ def read_parameters():
         experiment_name = 'Emotions'
 
         dim = 72
-        sigma_default = 0.5
+        sigma_default = 0.2
         delta_default = 50
         N_default = 5
 
@@ -153,8 +153,8 @@ def run(dataset, mode, input_path, experiment_name, dim, sigma, delta, N, regist
     model = EVeC(y.shape[1], sigma, delta, N)
 
     predictions = np.zeros((y.shape[0], y.shape[1]), dtype=int)
-    number_of_rules = np.zeros((y.shape[0], 1))
-    time_ = np.zeros((y.shape[0], 1))
+    accuracy = np.zeros(y.shape[0]); recall = np.zeros(y.shape[0]); precision = np.zeros(y.shape[0]); F1 = np.zeros(y.shape[0]); 
+    AUC = np.zeros(y.shape[0]); number_of_rules = np.zeros(y.shape[0]); time_ = np.zeros(y.shape[0])
 
     for i in tqdm(range(y.shape[0])):
         start = time.time()
@@ -162,10 +162,15 @@ def run(dataset, mode, input_path, experiment_name, dim, sigma, delta, N, regist
         model.train(X[i, :].reshape(1, -1), y[i].reshape(-1), np.array([[i]]))
 
         end = time.time()
-        time_[i, 0] = end - start
 
         # Saving statistics for the step i
-        number_of_rules[i, 0] = model.c
+        time_[i] = end - start        
+        accuracy[i] = accuracy_score(y[:i+1], predictions[:i+1])
+        recall[i] = recall_score(y[:i+1], predictions[:i+1], average='micro')
+        precision[i] = precision_score(y[:i+1], predictions[:i+1], average='micro')
+        F1[i] = f1_score(y[:i+1], predictions[:i+1], average='micro')
+        AUC[i] = roc_auc_score(y[:i+1], predictions[:i+1], average='micro')        
+        number_of_rules[i] = model.c
 
         if plot_frequency != -1: 
             if len(plot_frequency) == 1:
@@ -178,11 +183,21 @@ def run(dataset, mode, input_path, experiment_name, dim, sigma, delta, N, regist
         np.savetxt(artifact_uri + 'predictions.csv', predictions, fmt='%i')
         np.savetxt(artifact_uri + 'rules.csv', number_of_rules, fmt='%i')
         np.savetxt(artifact_uri + 'time.csv', time_)
-
+        
+        plot_graph(accuracy, 'Accuracy', 'Step', artifact_uri + 'Accuracy.png')
+        plot_graph(recall, 'Recall', 'Step', artifact_uri + 'Recall.png')
+        plot_graph(precision, 'Precision', 'Step', artifact_uri + 'Precision.png')
+        plot_graph(F1, 'F1', 'Step', artifact_uri + 'F1.png')
+        plot_graph(AUC, 'AUC', 'Step', artifact_uri + 'AUC.png')
         plot_graph(number_of_rules, 'Number of rules', 'Step', artifact_uri + 'rules.png')
 
+        mlflow.log_metric('Accuracy', accuracy_score(y, predictions))
+        mlflow.log_metric('Recall', recall_score(y, predictions, average='micro'))
+        mlflow.log_metric('Precision', precision_score(y, predictions, average='micro'))
+        mlflow.log_metric('F1', f1_score(y, predictions, average='micro'))
+        mlflow.log_metric('AUC', roc_auc_score(y, predictions, average='micro'))
         mlflow.log_metric('Mean_rules', np.mean(number_of_rules))
-        mlflow.log_metric('Last_No_rule', number_of_rules[-1, 0])
+        mlflow.log_metric('Last_No_rule', number_of_rules[-1])
 
         mlflow.end_run()        
 
