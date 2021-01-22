@@ -58,9 +58,9 @@ def read_parameters():
         experiment_name = 'Emotions'
 
         dim = 72
-        sigma_default = 0.2
-        delta_default = 50
-        N_default = 5
+        sigma_default = 0.2623
+        delta_default = 37
+        N_default = 9
 
     input_path = input('Enter the dataset path (default = ' + input_path_default + '): ')
     if input_path == '':

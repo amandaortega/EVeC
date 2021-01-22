@@ -93,7 +93,13 @@ class EVeC(object):
         if index is None:
             return np.concatenate(self.X)
         else:
-            return np.concatenate(list(map(self.X.__getitem__, [i for i in range(len(self.label)) if self.label[i] != self.label[index]])))
+            indexes = [i for i in range(len(self.label)) if self.label[i] == self.label[index] and i != index]
+
+            if len(indexes) > 0:
+                return np.concatenate(list(map(self.X.__getitem__, indexes)))
+
+            # if there is no other rule besides the current rule with the same label, return the remaining rules regardless the label content
+            return np.concatenate(self.X[:index] + self.X[index + 1 :])
 
     # Merge two rules of different clusters whenever the origin of one is inside the sigma probability of inclusion of the psi curve of the other
     def merge(self):
@@ -168,10 +174,24 @@ class EVeC(object):
             return np.zeros(self.L, dtype=int)
 
         output_labels = np.zeros(self.L, dtype=int)
+        max_firing = 0
+        label_max_firing = -1
+        fired = False
 
         for i in range(self.c):
-            if self.firing_degree(i, x) >= self.sigma:
+            firing = self.firing_degree(i, x)
+
+            if firing >= self.sigma:
                 output_labels[self.label[i]] = 1
+                fired = True
+            
+            if firing > max_firing:
+                max_firing = firing
+                label_max_firing = self.label[i]
+
+        # guarantee that at least one label is set to 1
+        if not fired:
+            output_labels[label_max_firing] = 1
 
         return output_labels
 
