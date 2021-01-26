@@ -1,7 +1,7 @@
 # Least_SRMTL
 # Sparse Structure-Regularized Learning with Least Squares Loss.
-# Adapted from the MALSAR package by Amanda O. C. Ayres
-# May 2020
+# Adapted from the MALSAR package by Amanda O. C. Ayres in May 2020
+# Updated to include multiple output problems in Jan 2021
 
 # OBJECTIVE
 # argmin_W { sum_i^t (0.5 * norm (Y{i} - X{i}' * W(:, i))^2)
@@ -14,13 +14,17 @@
 
 # INPUT
 #    X: {n * d} * t - input matrix
-#    Y: {n * 1} * t - output matrix
-#    R: regularization structure
+#    Y: {n * L} * t - output matrix
+#    n: number of samples
+#    d: input dimension
+#    L: output dimenion
+#    t: number of tasks
+#    R: t * no. connections - regularization structure
 #    rho1: structure regularization parameter
 #    rho2: sparsity controlling parameter
 
 # OUTPUT
-#    W: model: d * t
+#    W: model: {d * L} * t
 #    funcVal: function value vector.
 
 # RELATED PAPERS
@@ -47,7 +51,7 @@ class Least_SRMTL(object):
         funcVal = 0
 
         for i in range(self.t):
-            funcVal = funcVal + 0.5 * np.linalg.norm(Y[i] - X[i].T @ W[:, i].reshape(-1, 1)) ** 2
+            funcVal = funcVal + 0.5 * np.linalg.norm(Y[i] - X[i].T @ W[:, :, i]) ** 2
 
         if self.R is None:
             return funcVal + self.rho_3 * np.linalg.norm(W, 'fro') ** 2
@@ -57,9 +61,9 @@ class Least_SRMTL(object):
         grad_W = np.zeros((X[0].shape[0], self.t))
 
         for t_ii in range(self.t):
-            XWi = X[t_ii].T @ W[:,t_ii]
+            XWi = X[t_ii].T @ W[:,:,t_ii]
             XTXWi = X[t_ii] @ XWi
-            grad_W[:, t_ii] = XTXWi - XY[t_ii].reshape(-1)
+            grad_W[:, :, t_ii] = XTXWi - XY[t_ii]
 
         if self.RRt is None:
             return grad_W + self.rho_3 * 2 * W
@@ -101,7 +105,7 @@ class Least_SRMTL(object):
             W0 = self.W
         else:
             self.t = len(X)
-            W0 = np.zeros((X[0].shape[1] + 1, self.t))
+            W0 = np.zeros((X[0].shape[1] + 1, Y[0].shape[1], self.t))
         
         X = self.multi_transpose(X)
         XY = list()

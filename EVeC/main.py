@@ -46,6 +46,19 @@ def read_parameters():
         mode = TEST  
 
     try:
+        version = int(input('What version of EVeC do you want to run? (0/1)\n'))
+    except ValueError:
+        version = 1
+
+    if version != 0:
+        try:
+            consequent = int(input('How to calculate the parameters at the consequent?\n1- LS\n2- MTL (default)\n')) - 1
+        except ValueError:
+            consequent = 1
+    else:
+        consequent = None
+
+    try:
         dataset = int(input('Enter the dataset to be tested:\n1- Emotions (default)\n'))
     except ValueError:
         dataset = EMOTIONS
@@ -61,6 +74,7 @@ def read_parameters():
         sigma_default = 0.2623
         delta_default = 37
         N_default = 9
+        rho_default = 1
 
     input_path = input('Enter the dataset path (default = ' + input_path_default + '): ')
     if input_path == '':
@@ -81,6 +95,13 @@ def read_parameters():
     N = list(map(int, input('Enter the size of the window (default value = ' + str(N_default) + '): ').split()))
     if len(N) == 0:
         N = [N_default]
+
+    if consequent is not None and consequent == 1:
+        rho = list(map(float, input('Enter the rho (default value = ' + str(rho_default) + '): ').split()))
+        if len(rho) == 0:
+            rho = [rho_default]
+    else:
+        rho = None        
 
     register_experiment = input('Register the experiment? (default value = true): ')
 
@@ -103,9 +124,9 @@ def read_parameters():
     else:
         plot_frequency = -1
     
-    return [dataset, mode, input_path, experiment_name, dim, sigma, delta, N, register_experiment, plot_frequency]
+    return [dataset, mode, version, consequent, input_path, experiment_name, dim, sigma, delta, N, rho, register_experiment, plot_frequency]
 
-def run(dataset, mode, input_path, experiment_name, dim, sigma, delta, N, register_experiment, plot_frequency):
+def run(dataset, mode, version, consequent, input_path, experiment_name, dim, sigma, delta, N, rho, register_experiment, plot_frequency):
     mlflow.set_experiment(experiment_name)
 
     print("EVeC - " + experiment_name + ": sigma = " + str(sigma) + ", delta = " + str(delta) + ", N = " + str(N))
@@ -150,11 +171,21 @@ def run(dataset, mode, input_path, experiment_name, dim, sigma, delta, N, regist
         mlflow.log_param("delta", delta)
         mlflow.log_param("N", N)
 
-    model = EVeC(y.shape[1], sigma, delta, N)
+    if version == 0:
+        model = EVeC(y.shape[1], sigma, delta, N)
+    elif rho is None:
+        model = EVeC(y.shape[1], sigma, delta, N, version=1)
+    else:
+        model = EVeC(y.shape[1], sigma, delta, N, version=1, rho=rho)
 
     predictions = np.zeros((y.shape[0], y.shape[1]), dtype=int)
-    accuracy = np.zeros(y.shape[0]); recall = np.zeros(y.shape[0]); precision = np.zeros(y.shape[0]); F1 = np.zeros(y.shape[0]); 
-    AUC = np.zeros(y.shape[0]); number_of_rules = np.zeros(y.shape[0]); time_ = np.zeros(y.shape[0])
+    accuracy = np.zeros(y.shape[0]) 
+    recall = np.zeros(y.shape[0])
+    precision = np.zeros(y.shape[0])
+    F1 = np.zeros(y.shape[0]); 
+    AUC = np.zeros(y.shape[0])
+    number_of_rules = np.zeros(y.shape[0])
+    time_ = np.zeros(y.shape[0])
 
     for i in tqdm(range(y.shape[0])):
         start = time.time()
@@ -206,9 +237,13 @@ if __name__ == "__main__":
     abspath = os.path.abspath(__file__)
     os.chdir(os.path.dirname(abspath)) 
 
-    [dataset, mode, input_path, experiment_name, dim, sigmas, deltas, Ns, register_experiment, plot_frequency] = read_parameters()
+    [dataset, mode, version, consequent, input_path, experiment_name, dim, sigmas, deltas, Ns, rhos, register_experiment, plot_frequency] = read_parameters()
 
     for sigma in sigmas:
         for delta in deltas:
             for N in Ns:
-                run(dataset, mode, input_path, experiment_name, dim, sigma, delta, N, register_experiment, plot_frequency)
+                if rhos is None:
+                    run(dataset, mode, version, consequent, input_path, experiment_name, dim, sigma, delta, N, rhos, register_experiment, plot_frequency)
+                else:
+                    for rho in rhos:
+                        run(dataset, mode, version, consequent, input_path, experiment_name, dim, sigma, delta, N, rho, register_experiment, plot_frequency)
