@@ -54,11 +54,11 @@ class Least_SRMTL(object):
             funcVal = funcVal + 0.5 * np.linalg.norm(Y[i] - X[i].T @ W[:, :, i]) ** 2
 
         if self.R is None:
-            return funcVal + self.rho_3 * np.linalg.norm(W, 'fro') ** 2
-        return funcVal + self.rho_1 * np.linalg.norm(W @ self.R, 'fro') ** 2 + self.rho_3 * np.linalg.norm(W, 'fro') ** 2
+            return funcVal + self.rho_3 * np.linalg.norm(W) ** 2
+        return funcVal + self.rho_1 * np.linalg.norm(W @ self.R) ** 2 + self.rho_3 * np.linalg.norm(W) ** 2
 
     def gradVal_eval(self, X, XY, W):
-        grad_W = np.zeros((X[0].shape[0], self.t))
+        grad_W = np.zeros((XY[0].shape[0], XY[0].shape[1], self.t))
 
         for t_ii in range(self.t):
             XWi = X[t_ii].T @ W[:,:,t_ii]
@@ -139,9 +139,9 @@ class Least_SRMTL(object):
                 Fzp = self.funVal_eval(X, Y, Wzp)
                 
                 delta_Wzp = Wzp - Ws
-                r_sum = np.linalg.norm(delta_Wzp, ord='fro') ** 2
+                r_sum = np.linalg.norm(delta_Wzp) ** 2
 
-                Fzp_gamma = Fs + np.trace(delta_Wzp.T @ gWs) + gamma / 2 * np.linalg.norm(delta_Wzp, 'fro') ** 2
+                Fzp_gamma = Fs + np.sum(np.trace(np.matmul(np.moveaxis(delta_Wzp, -1, 0), np.moveaxis(np.moveaxis(gWs, -1, 0), -1, 1)), axis1=1, axis2=2)) + gamma / 2 * np.linalg.norm(delta_Wzp) ** 2
                 
                 if r_sum <= 1e-20:
                     # this shows that the gradient step makes little improvement
@@ -172,5 +172,4 @@ class Least_SRMTL(object):
         
         self.W = Wzp
 
-        W_return = list(self.W.T)
-        return [w.reshape(1, -1) for w in W_return]
+        return [self.W[:, :, t] for t in range(self.W.shape[2])]

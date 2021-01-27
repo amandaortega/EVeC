@@ -64,10 +64,12 @@ class EVeC(object):
         if self.version == 0:
             self.label.append(label)
         else:
-            self.y.append(y0.reshape(1, -1))
-            self.theta.append(np.linalg.lstsq(np.insert(self.X[-1], 0, 1, axis=1), self.y[-1], rcond=None)[0])
+            self.y.append(y0.reshape(1, -1))            
 
-            if self.rho is not None:
+            if self.rho is None:
+                self.theta.append(np.linalg.lstsq(np.insert(self.X[-1], 0, 1, axis=1), self.y[-1], rcond=None)[0])
+            else:
+                self.theta.append(np.zeros((x0.shape[0], x0.shape[1] + 1)))
                 self.init_theta = 2
 
     # Add the sample(s) (X, label) as covered by the extreme vector. Remove repeated points.
@@ -245,10 +247,10 @@ class EVeC(object):
             firing[i] = self.firing_degree(i, x)
         
         # weighted average of the local predictions and the corresponding firing degrees
-        output = np.sum(np.multiply(output / np.sum(output, axis=0), np.repeat(firing.reshape(-1, 1), self.L, axis=1)), axis=0) / np.sum(firing)
+        output = np.sum(np.multiply(output, np.repeat(firing.reshape(-1, 1), self.L, axis=1)), axis=0) / np.sum(firing)
 
-        # the final values: 1 if above the threshold and 0 otherwise
-        final_output = np.where(output >= self.sigma, 1, 0)
+        # the final values: 1 if above 0.5 and 0 otherwise
+        final_output = np.where(output >= 0.5, 1, 0)
 
         # guarantee that at least one label is set to 1
         if np.all(final_output == 0):            
@@ -258,9 +260,7 @@ class EVeC(object):
 
     # Predict the local output of x based on the linear regression of the samples stored at the rule
     def predict_rule(self, index, x):
-        if self.rho is None:
-            return np.insert(x, 0, 1).reshape(1, -1) @ self.theta[index]
-        return np.insert(x, 0, 1).reshape(1, -1) @ self.theta[index].T        
+        return np.insert(x, 0, 1).reshape(1, -1) @ self.theta[index]
 
     # Calculate the degree of relationship of all the rules to the rule of index informed as parameter
     def relationship_rules(self, index):
@@ -351,18 +351,29 @@ class EVeC(object):
                     best_EV = index
                     best_EV_value = tau
 
+            update = False
+
             # Add the sample to an existing EV
             if best_EV is not None:
                 self.add_sample_to_rule(best_EV, x, step, y.reshape(1, -1))
             # Create a new EV
             else:
                 self.add_rule(x, step, y0=y)
+                update = True
         
         self.update_rules()
 
         if step != 0 and (step % self.delta) == 0:      
             self.remove_outdated_rules(step[0, 0] - self.delta)
             self.merge()
+            update = True
+
+        if self.rho is not None:
+            if update:
+                self.update_R()
+
+            self.theta = self.srmtl.train(self.X, self.y, self.init_theta)
+            self.init_theta = 1            
 
     # Update the psi curve of the rules
     def update_rules(self):
