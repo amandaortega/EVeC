@@ -16,6 +16,7 @@ import warnings
 # databases IDs
 EMOTIONS = 1
 
+# mode
 TRAINING = 0
 TEST = 1
 
@@ -46,17 +47,9 @@ def read_parameters():
         mode = TEST  
 
     try:
-        version = int(input('What version of EVeC do you want to run? (0/1)\n'))
+        version = int(input('What version of EVeC do you want to run?\n1- No regression\n2- Least squares\n3- Least SRMTL\n4- Logistic SRMTL\n')) - 1
     except ValueError:
-        version = 1
-
-    if version != 0:
-        try:
-            consequent = int(input('How to calculate the parameters at the consequent?\n1- LS\n2- MTL (default)\n')) - 1
-        except ValueError:
-            consequent = 1
-    else:
-        consequent = None
+        version = EVeC.LS
 
     try:
         dataset = int(input('Enter the dataset to be tested:\n1- Emotions (default)\n'))
@@ -96,7 +89,7 @@ def read_parameters():
     if len(N) == 0:
         N = [N_default]
 
-    if consequent is not None and consequent == 1:
+    if version in [EVeC.LEAST_SRMTL, EVeC.LOGISTIC_SRMTL]:
         rho = list(map(float, input('Enter the rho (default value = ' + str(rho_default) + '): ').split()))
         if len(rho) == 0:
             rho = [rho_default]
@@ -124,12 +117,15 @@ def read_parameters():
     else:
         plot_frequency = -1
     
-    return [dataset, mode, version, consequent, input_path, experiment_name, dim, sigma, delta, N, rho, register_experiment, plot_frequency]
+    return [dataset, mode, version, input_path, experiment_name, dim, sigma, delta, N, rho, register_experiment, plot_frequency]
 
-def run(dataset, mode, version, consequent, input_path, experiment_name, dim, sigma, delta, N, rho, register_experiment, plot_frequency):
+def run(dataset, mode, version, input_path, experiment_name, dim, sigma, delta, N, rho, register_experiment, plot_frequency):
     mlflow.set_experiment(experiment_name)
 
-    print("EVeC - " + experiment_name + ": sigma = " + str(sigma) + ", delta = " + str(delta) + ", N = " + str(N))
+    if version == EVeC.NO_REGRESSION:
+        print("EVeC - " + experiment_name + ": sigma = " + str(sigma) + ", delta = " + str(delta) + ", N = " + str(N))
+    else:
+        print("EVeC - " + experiment_name + ": sigma = " + str(sigma) + ", delta = " + str(delta) + ", N = " + str(N) + ", rho = " + str(rho))
 
     X_train = read_csv(input_path + 'X_train.csv')
 
@@ -171,12 +167,7 @@ def run(dataset, mode, version, consequent, input_path, experiment_name, dim, si
         mlflow.log_param("delta", delta)
         mlflow.log_param("N", N)
 
-    if version == 0:
-        model = EVeC(y.shape[1], sigma, delta, N)
-    elif rho is None:
-        model = EVeC(y.shape[1], sigma, delta, N, version=1)
-    else:
-        model = EVeC(y.shape[1], sigma, delta, N, version=1, rho=rho)
+    model = EVeC(y.shape[1], sigma, delta, N, version, rho)
 
     predictions = np.zeros((y.shape[0], y.shape[1]), dtype=int)
     accuracy = np.zeros(y.shape[0]) 
@@ -237,13 +228,13 @@ if __name__ == "__main__":
     abspath = os.path.abspath(__file__)
     os.chdir(os.path.dirname(abspath)) 
 
-    [dataset, mode, version, consequent, input_path, experiment_name, dim, sigmas, deltas, Ns, rhos, register_experiment, plot_frequency] = read_parameters()
+    [dataset, mode, version, input_path, experiment_name, dim, sigmas, deltas, Ns, rhos, register_experiment, plot_frequency] = read_parameters()
 
     for sigma in sigmas:
         for delta in deltas:
             for N in Ns:
                 if rhos is None:
-                    run(dataset, mode, version, consequent, input_path, experiment_name, dim, sigma, delta, N, rhos, register_experiment, plot_frequency)
+                    run(dataset, mode, version, input_path, experiment_name, dim, sigma, delta, N, rhos, register_experiment, plot_frequency)
                 else:
                     for rho in rhos:
-                        run(dataset, mode, version, consequent, input_path, experiment_name, dim, sigma, delta, N, rho, register_experiment, plot_frequency)
+                        run(dataset, mode, version, input_path, experiment_name, dim, sigma, delta, N, rho, register_experiment, plot_frequency)

@@ -1,11 +1,11 @@
-# Least_SRMTL
-# Sparse Structure-Regularized Learning with Least Squares Loss.
-# Adapted from the MALSAR package by Amanda O. C. Ayres in May 2020
+# Logistic_SRMTL
+# Sparse Structure-Regularized Learning with Logistic Loss.
+# Adapted from the MALSAR package by Amanda O. C. Ayres in Jan 2021
 # Updated to include multiple output problems in Jan 2021
 
 # OBJECTIVE
-# argmin_W { sum_i^t (0.5 * norm (Y{i} - X{i}' * W(:, i))^2)
-#             + rho1 * norm(W*R, 'fro')^2 + rho2 * \|W\|_1}
+# argmin_{W,C} { sum_i^t (- sum(log (1./ (1+ exp(-X{i}*W(:, i) - Y{i} .* C(i)))))/length(Y{i}))
+#            + rho1 * norm(W*R, 'fro')^2 + rho2 * \|W\|_1}
 
 # R encodes the structure relationship
 # 1)Structure order is given by using [s12 -s12 0 ...; 0 s23 -s23 ...; ...]
@@ -25,6 +25,7 @@
 
 # OUTPUT
 #    W: model: {d * L} * t
+#    C: model: L * t
 #    funcVal: function value vector.
 
 # RELATED PAPERS
@@ -32,9 +33,12 @@
 # [1] Evgeniou, T. and Pontil, M. Regularized multi-task learning, KDD 2004
 # [2] Zhou, J. Technical Report. http://www.public.asu.edu/~jzhou29/Software/SRMTL/CrisisEventProjectReport.pdf
 
+# RELATED FUNCTIONS
+# Least_SRMTL, init_opts
+
 import numpy as np
 
-class Least_SRMTL(object):
+class Logistic_SRMTL(object):
     # Default values
     DEFAULT_MAX_ITERATION = 1000
     DEFAULT_TOLERANCE     = 1e-4
@@ -46,6 +50,7 @@ class Least_SRMTL(object):
         self.rho_3 = rho_3   
         self.funcVal = None
         self.W = None
+        self.C0 = None
     
     def funVal_eval(self, X, Y, W):
         funcVal = 0
@@ -103,16 +108,21 @@ class Least_SRMTL(object):
 
         if init_theta == 1:
             W0 = self.W
+            C0 = self.C0
         else:
             self.t = len(X)
             W0 = np.zeros((X[0].shape[1] + 1, Y[0].shape[1], self.t))
         
         X = self.multi_transpose(X)
-        XY = list()
+
+        # initialize a starting point
+        C0_prep = np.zeros(Y[0].shape[1], self.t)
 
         for t_idx in range(self.t):
-            XY.append(X[t_idx] @ Y[t_idx])
-            W0[:, :, t_idx] = XY[-1]
+            m1 = np.sum(Y[t_idx], axis=0)
+            m2 = Y[t_idx].shape[0] - m1
+            # ToDo: consider the zero and inf cases
+            C0_prep[:, t_idx] = log(m1/m2)
         
         # this flag tests whether the gradient step only changes a little
         bFlag = 0 
@@ -173,4 +183,12 @@ class Least_SRMTL(object):
         
         self.W = Wzp
 
-        return [self.W[:, :, t] for t in range(self.W.shape[2])]
+        return ([self.W[:, :, t] for t in range(self.W.shape[2])], self.C)
+
+    # function value evaluation for each task
+    def unit_funcVal_eval(W, C, X, Y):
+        m = length(y)
+        weight = ones(m, 1)/m
+        aa = -y.*(x'*w + c)
+        bb = max( aa, 0)
+        funcVal = weight'* ( log( exp(-bb) +  exp(aa-bb) ) + bb ) 

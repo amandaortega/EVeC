@@ -13,7 +13,6 @@ import numpy.matlib
 import sklearn.metrics
 
 class EVeC(object):
-
     """
     Extreme Value evolving Classifier
     Ruled-based classifier with EVM at the definition of the antecedent of the rules.    
@@ -21,6 +20,12 @@ class EVeC(object):
     2. Call the predict(x) method to make predictions based on the given input;
     3. Call the train(x, y) method to evolve the model based on the new input-output pair.
     """
+
+    # version
+    NO_REGRESSION = 0
+    LS = 1
+    LEAST_SRMTL = 2
+    LOGISTIC_SRMTL = 3
 
     # Model initialization
     def __init__(self, L, sigma=0.5, delta=50, N=np.Inf, version=0, rho=None):
@@ -41,7 +46,7 @@ class EVeC(object):
         self.c = 0
 
         # Version that trains the consequent using linear regression
-        if version == 0:
+        if version == EVeC.NO_REGRESSION:
             self.label = list()
         else:
             self.y = list()
